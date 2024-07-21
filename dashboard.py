@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import pandas as pd
 import joblib
@@ -22,6 +23,10 @@ df = pd.read_csv(data_path)
 # Assurer que les identifiants clients sont des entiers
 df['SK_ID_CURR'] = df['SK_ID_CURR'].astype(int)
 
+# Limiter aux 10 premiers identifiants clients
+unique_client_ids = df['SK_ID_CURR'].unique()
+limited_client_ids = unique_client_ids[:10]  # Sélectionner les 10 premiers identifiants
+
 # Définir les couleurs avec un contraste élevé
 colors = {
     'all_clients': '#1f77b4',  # Blue with high contrast
@@ -35,7 +40,7 @@ st.title("Dashboard Interactif de Prédiction de Risque de Crédit")
 st.sidebar.header("Recherche d'Identifiant Client")
 client_id = st.sidebar.selectbox(
     "Sélectionnez l'identifiant du client:",
-    ["Sélectionner un client"] + df['SK_ID_CURR'].astype(str).tolist()
+    ["Sélectionner un client"] + list(map(str, limited_client_ids))
 )
 
 # Ajouter des boutons pour afficher les informations supplémentaires
@@ -186,12 +191,9 @@ if client_id and client_id != "Sélectionner un client":
             - **Caractéristiques positives (rouge)** : Ces caractéristiques augmentent la probabilité de défaut du client.
             - **Caractéristiques négatives (bleu)** : Ces caractéristiques réduisent la probabilité de défaut du client.
 
-                        Par exemple, si le revenu du client est beaucoup plus bas que la moyenne, cela pourrait augmenter son risque de défaut, et donc apparaître comme une caractéristique rouge.
+            Par exemple, si le revenu du client est beaucoup plus bas que la moyenne, cela pourrait augmenter son risque de défaut, et donc apparaître comme une caractéristique rouge.
             À l'inverse, une longue durée d'emploi stable pourrait réduire le risque de défaut, apparaissant comme une caractéristique bleue.
             """)
-
-            st.caption(
-                "Graphique montrant l'importance des caractéristiques locales pour le client sélectionné. Les valeurs SHAP indiquent comment chaque caractéristique influence la prédiction du modèle.")
 
         elif option == "Distributions des Caractéristiques":
             st.subheader("Comparaison des Informations Descriptives")
@@ -233,3 +235,6 @@ if client_id and client_id != "Sélectionner un client":
             st.caption(
                 "Graphique montrant la distribution de la variable sélectionnée pour tous les clients et la position du client sélectionné.")
 
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8501))
+    st.run(port=port)
