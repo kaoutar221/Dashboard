@@ -237,4 +237,4 @@ if client_id and client_id != "Sélectionner un client":
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8501))
-    st.run(port=port)
+    st._is_running_with_streamlit = True
