@@ -1,0 +1,11 @@
+flask
+pytest
+pytest-cov
+pandas
+scikit-learn
+joblib
+imblearn
+gunicorn
+streamlit==1.33.0
+protobuf==3.20.0
+altair==4.1.0
