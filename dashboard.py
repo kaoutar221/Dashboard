@@ -4,6 +4,7 @@ import pandas as pd
 import joblib
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
+import plotly.express as px
 import numpy as np
 import shap
 
@@ -25,7 +26,7 @@ df['SK_ID_CURR'] = df['SK_ID_CURR'].astype(int)
 
 # Limiter aux 10 premiers identifiants clients
 unique_client_ids = df['SK_ID_CURR'].unique()
-limited_client_ids = unique_client_ids[:50]  # Sélectionner les 10 premiers identifiants
+limited_client_ids = unique_client_ids[:10]  # Sélectionner les 10 premiers identifiants
 
 # Définir les couleurs avec un contraste élevé
 colors = {
@@ -45,7 +46,9 @@ client_id = st.sidebar.selectbox(
 
 # Ajouter des boutons pour afficher les informations supplémentaires
 st.sidebar.header("Navigation")
-option = st.sidebar.radio("Choisissez une option:", ["Informations Personnelles", "Importance des Caractéristiques", "Distributions des Caractéristiques"])
+option = st.sidebar.radio("Choisissez une option:", ["Informations Personnelles", "Importance des Caractéristiques",
+                                                     "Distributions des Caractéristiques", "Analyse Bi-Variée",
+                                                     "Autres Analyses"])
 
 threshold = 0.45  # Fixer le seuil à 0.45
 
@@ -101,7 +104,8 @@ if client_id and client_id != "Sélectionner un client":
                         'value': threshold}}))
 
             st.plotly_chart(fig, use_container_width=True)
-            st.caption("Graphique interactif du score de prédiction. Le graphique montre une jauge avec le score de prédiction du client.")
+            st.caption(
+                "Graphique interactif du score de prédiction. Le graphique montre une jauge avec le score de prédiction du client.")
 
             # Interprétation pour une personne non experte
             if probability < threshold:
@@ -116,7 +120,8 @@ if client_id and client_id != "Sélectionner un client":
                 st.write(
                     "La probabilité de défaut est proche du seuil. Cela signifie que le client est dans une zone grise et nécessite peut-être une analyse plus approfondie.")
             else:
-                st.write("La probabilité de défaut est nettement éloignée du seuil, indiquant une décision plus claire.")
+                st.write(
+                    "La probabilité de défaut est nettement éloignée du seuil, indiquant une décision plus claire.")
 
             # Explication sur les risques de crédit
             st.write("""
@@ -157,7 +162,8 @@ if client_id and client_id != "Sélectionner un client":
                                   yaxis=dict(range=[0, max(selected_importances) * 1.1]))
 
                 st.plotly_chart(fig)
-                st.caption("Graphique montrant les caractéristiques les plus importantes pour le modèle. Les barres représentent l'importance relative de chaque caractéristique.")
+                st.caption(
+                    "Graphique montrant les caractéristiques les plus importantes pour le modèle. Les barres représentent l'importance relative de chaque caractéristique.")
 
             except AttributeError:
                 st.error("Le modèle sélectionné ne supporte pas l'attribut 'feature_importances_'.")
@@ -179,7 +185,8 @@ if client_id and client_id != "Sélectionner un client":
             fig, ax = plt.subplots(figsize=(10, 5))
             shap.waterfall_plot(shap_values[0], max_display=num_local_features, show=False)
             st.pyplot(fig)
-            st.caption("Graphique montrant l'importance des caractéristiques locales pour le client sélectionné. Les valeurs SHAP indiquent comment chaque caractéristique influence la prédiction du modèle.")
+            st.caption(
+                "Graphique montrant l'importance des caractéristiques locales pour le client sélectionné. Les valeurs SHAP indiquent comment chaque caractéristique influence la prédiction du modèle.")
 
             # Ajouter une interprétation des résultats locaux
             st.write("""
@@ -199,41 +206,128 @@ if client_id and client_id != "Sélectionner un client":
             st.subheader("Comparaison des Informations Descriptives")
 
             # Sélectionner des variables pour comparaison
-            selected_feature = st.selectbox("Sélectionnez une variable pour comparaison:", feature_names)
+            selected_features = st.multiselect("Sélectionnez des variables pour comparaison:", feature_names,
+                                               default=feature_names[:2])
 
-            # Ajout des descriptions pour les graphiques
+            for selected_feature in selected_features:
+                # Ajout des descriptions pour les graphiques
+                fig, ax = plt.subplots()
+                df[selected_feature].hist(ax=ax, bins=30, alpha=0.5, color=colors['all_clients'],
+                                          label='Tous les clients')
+                ax.axvline(client_data[selected_feature].values[0], color=colors['selected_client'], linestyle='dashed',
+                           linewidth=2, label='Client sélectionné')
+                ax.set_title(f"Distribution de {selected_feature}")
+                ax.legend()
+                ax.set_xlabel(selected_feature)
+                ax.set_ylabel('Nombre de clients')
+
+                # Ajouter les statistiques descriptives
+                mean_val = df[selected_feature].mean()
+                median_val = df[selected_feature].median()
+                std_val = df[selected_feature].std()
+
+                st.write(f"Moyenne de {selected_feature} pour tous les clients : {mean_val:.2f}")
+                st.write(f"Médiane de {selected_feature} pour tous les clients : {median_val:.2f}")
+                st.write(f"Écart-type de {selected_feature} pour tous les clients : {std_val:.2f}")
+
+                # Ajouter une interprétation simple du graphique
+                st.write(f"**Interprétation du graphique :**")
+                st.write(
+                    f"Le graphique ci-dessus montre la distribution de la variable '{selected_feature}' pour tous les clients comparée à celle du client sélectionné.")
+                st.write(
+                    f"La barre bleue représente la fréquence des valeurs de '{selected_feature}' pour tous les clients, tandis que la ligne rouge pointillée montre la valeur de cette variable pour le client sélectionné.")
+                st.write(
+                    f"Si la ligne rouge est proche de la moyenne (ligne centrale de la barre bleue), cela signifie que la valeur de cette caractéristique pour le client est proche de celle de la majorité des autres clients.")
+                st.write(
+                    f"Des écarts significatifs peuvent indiquer des différences notables par rapport à la moyenne des clients, ce qui peut aider à identifier des particularités ou des risques potentiels.")
+
+                st.pyplot(fig)
+                st.caption(
+                    "Graphique montrant la distribution de la variable sélectionnée pour tous les clients et la position du client sélectionné.")
+
+        elif option == "Analyse Bi-Variée":
+            st.subheader("Analyse Bi-Variée")
+
+            # Sélectionner deux variables pour l'analyse bi-variée
+            feature_x = st.selectbox("Sélectionnez la première variable (axe X):", feature_names)
+            feature_y = st.selectbox("Sélectionnez la deuxième variable (axe Y):", feature_names, index=1)
+
+            # Calculer les scores de prédiction pour toutes les données
+            scores = pipeline.predict_proba(df[feature_names])[:, 1]
+
+            # Créer le graphique bi-varié
+            fig = px.scatter(
+                df, x=feature_x, y=feature_y, color=scores, color_continuous_scale='Viridis',
+                labels={'color': 'Score de Prédiction'},
+                title=f"Analyse Bi-Variée entre {feature_x} et {feature_y}"
+            )
+
+            # Ajouter la position du client sélectionné
+            fig.add_trace(go.Scatter(
+                x=[client_data[feature_x].values[0]], y=[client_data[feature_y].values[0]],
+                mode='markers',
+                marker=dict(color='red', size=12, symbol='x'),
+                name='Client Sélectionné'
+            ))
+
+            st.plotly_chart(fig)
+            st.caption(
+                "Graphique montrant l'analyse bi-variée entre les deux caractéristiques sélectionnées avec un dégradé de couleur selon le score des clients et le positionnement du client sélectionné.")
+
+        elif option == "Autres Analyses":
+            st.subheader("Autres Analyses des Clients")
+
+            # Distribution des scores de prédiction pour tous les clients
+            st.subheader("Distribution des Scores de Prédiction")
+            scores = pipeline.predict_proba(df[feature_names])[:, 1]
             fig, ax = plt.subplots()
-            df[selected_feature].hist(ax=ax, bins=30, alpha=0.5, color=colors['all_clients'], label='Tous les clients')
-            ax.axvline(client_data[selected_feature].values[0], color=colors['selected_client'], linestyle='dashed',
-                       linewidth=2, label='Client sélectionné')
-            ax.set_title(f"Distribution de {selected_feature}")
+            ax.hist(scores, bins=30, alpha=0.7, color='blue')
+            ax.axvline(probability, color='red', linestyle='dashed', linewidth=2, label='Client sélectionné')
+            ax.set_title('Distribution des Scores de Prédiction')
+            ax.set_xlabel('Score de Prédiction')
+            ax.set_ylabel('Nombre de Clients')
             ax.legend()
-            ax.set_xlabel(selected_feature)
-            ax.set_ylabel('Nombre de clients')
-
-            # Ajouter les statistiques descriptives
-            mean_val = df[selected_feature].mean()
-            median_val = df[selected_feature].median()
-            std_val = df[selected_feature].std()
-
-            st.write(f"Moyenne de {selected_feature} pour tous les clients : {mean_val:.2f}")
-            st.write(f"Médiane de {selected_feature} pour tous les clients : {median_val:.2f}")
-            st.write(f"Écart-type de {selected_feature} pour tous les clients : {std_val:.2f}")
-
-            # Ajouter une interprétation simple du graphique
-            st.write(f"**Interprétation du graphique :**")
-            st.write(
-                f"Le graphique ci-dessus montre la distribution de la variable '{selected_feature}' pour tous les clients comparée à celle du client sélectionné.")
-            st.write(
-                f"La barre bleue représente la fréquence des valeurs de '{selected_feature}' pour tous les clients, tandis que la ligne rouge pointillée montre la valeur de cette variable pour le client sélectionné.")
-            st.write(
-                f"Si la ligne rouge est proche de la moyenne (ligne centrale de la barre bleue), cela signifie que la valeur de cette caractéristique pour le client est proche de celle de la majorité des autres clients.")
-            st.write(
-                f"Des écarts significatifs peuvent indiquer des différences notables par rapport à la moyenne des clients, ce qui peut aider à identifier des particularités ou des risques potentiels.")
-
             st.pyplot(fig)
             st.caption(
-                "Graphique montrant la distribution de la variable sélectionnée pour tous les clients et la position du client sélectionné.")
+                "Histogramme montrant la distribution des scores de prédiction pour tous les clients avec une ligne indiquant le score du client sélectionné.")
+
+            # Graphique des caractéristiques importantes pour tous les clients
+            st.subheader("Importance des Caractéristiques Globales")
+            try:
+                importances = pipeline.named_steps['classifier'].feature_importances_
+                indices = np.argsort(importances)[::-1]
+                selected_features = [feature_names[i] for i in indices]
+                selected_importances = importances[indices]
+
+                fig = go.Figure([go.Bar(x=selected_features, y=selected_importances)])
+                fig.update_layout(title="Importance des Caractéristiques Globales",
+                                  xaxis_title="Caractéristiques",
+                                  yaxis_title="Importance",
+                                  yaxis=dict(range=[0, max(selected_importances) * 1.1]))
+
+                st.plotly_chart(fig)
+                st.caption("Graphique montrant l'importance des caractéristiques globales pour tous les clients.")
+
+            except AttributeError:
+                st.error("Le modèle sélectionné ne supporte pas l'attribut 'feature_importances_'.")
+
+            # Distribution de caractéristiques spécifiques pour tous les clients
+            st.subheader("Distribution des Caractéristiques Sélectionnées")
+            selected_features = st.multiselect("Sélectionnez des caractéristiques pour afficher les distributions:",
+                                               feature_names)
+            for feature in selected_features:
+                fig, ax = plt.subplots()
+                df[feature].hist(ax=ax, bins=30, alpha=0.5, color=colors['all_clients'], label='Tous les clients')
+                ax.axvline(client_data[feature].values[0], color=colors['selected_client'], linestyle='dashed',
+                           linewidth=2, label='Client sélectionné')
+                ax.set_title(f"Distribution de {feature}")
+                ax.legend()
+                ax.set_xlabel(feature)
+                ax.set_ylabel('Nombre de Clients')
+                st.pyplot(fig)
+                st.caption(
+                    f"Graphique montrant la distribution de {feature} pour tous les clients avec la valeur du client sélectionné.")
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8501))
