@@ -26,7 +26,7 @@ df['SK_ID_CURR'] = df['SK_ID_CURR'].astype(int)
 
 # Limiter aux 10 premiers identifiants clients
 unique_client_ids = df['SK_ID_CURR'].unique()
-limited_client_ids = unique_client_ids[:10]  # Sélectionner les 10 premiers identifiants
+limited_client_ids = unique_client_ids[:50]  # Sélectionner les 10 premiers identifiants
 
 # Définir les couleurs avec un contraste élevé
 colors = {
