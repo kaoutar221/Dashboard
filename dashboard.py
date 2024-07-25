@@ -8,6 +8,14 @@ import plotly.express as px
 import numpy as np
 import shap
 
+# Critères d'accessibilité
+st.set_page_config(
+    page_title="Dashboard Interactif de Prédiction de Risque de Crédit",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 # Charger le pipeline complet
 model_path = 'model/best_model_fbeta_gb.pkl'
 pipeline = joblib.load(model_path)
@@ -18,7 +26,7 @@ with open(feature_names_path, 'r') as f:
     feature_names = [line.strip() for line in f]
 
 # Charger les données
-data_path = 'data/sampled_df1 (1).csv'
+data_path = 'data/sampled_df1 (1).csv' 
 df = pd.read_csv(data_path)
 
 # Assurer que les identifiants clients sont des entiers
@@ -26,7 +34,7 @@ df['SK_ID_CURR'] = df['SK_ID_CURR'].astype(int)
 
 # Limiter aux 10 premiers identifiants clients
 unique_client_ids = df['SK_ID_CURR'].unique()
-limited_client_ids = unique_client_ids[:50]  # Sélectionner les 10 premiers identifiants
+limited_client_ids = unique_client_ids[:50]  
 
 # Définir les couleurs avec un contraste élevé
 colors = {
@@ -34,8 +42,37 @@ colors = {
     'selected_client': '#d62728'  # Red with high contrast
 }
 
+# Définir les définitions des features
+feature_definitions = {
+    "EXT_SOURCE_3": "Score externe source 3",
+    "EXT_SOURCE_2": "Score externe source 2",
+    "EXT_SOURCE_1": "Score externe source 1",
+    "CC_CNT_DRAWINGS_ATM_CURRENT_MEAN": "Nombre moyen de retraits au guichet automatique",
+    "CC_CNT_DRAWINGS_CURRENT_MAX": "Nombre maximum de retraits actuels",
+    "BURO_DAYS_CREDIT_MEAN": "Nombre moyen de jours de crédit",
+    "CC_AMT_BALANCE_MEAN": "Solde moyen des comptes de carte de crédit",
+    "CC_AMT_TOTAL_RECEIVABLE_MEAN": "Montant total moyen recevable",
+    "DAYS_BIRTH": "Nombre de jours depuis la naissance",
+    "PREV_NAME_CONTRACT_STATUS_Refused_MEAN": "Moyenne des contrats refusés précédemment",
+    "BURO_CREDIT_ACTIVE_Active_MEAN": "Moyenne des crédits actifs",
+    "PREV_CODE_REJECT_REASON_XAP_MEAN": "Moyenne des raisons de rejet XAP précédentes",
+    "BURO_DAYS_CREDIT_MIN": "Nombre minimum de jours de crédit",
+    "BURO_DAYS_CREDIT_UPDATE_MEAN": "Nombre moyen de jours depuis la mise à jour du crédit",
+    "DAYS_EMPLOYED_PERC": "Pourcentage de jours employés",
+    "PREV_NAME_CONTRACT_STATUS_Approved_MEAN": "Moyenne des contrats approuvés précédemment",
+    "CLOSED_DAYS_CREDIT_MIN": "Nombre minimum de jours de crédit fermé",
+    "ACTIVE_DAYS_CREDIT_MEAN": "Nombre moyen de jours de crédit actif",
+    "TARGET": "Cible (0 = remboursé, 1 = défaut)",
+    "SK_ID_CURR": "Identifiant client"
+}
+
 # Titre de l'application
 st.title("Dashboard Interactif de Prédiction de Risque de Crédit")
+
+# Afficher le tableau des features et définitions sur la page d'accueil
+st.subheader("Tableau des Features et Définitions")
+features_df = pd.DataFrame(list(feature_definitions.items()), columns=["Feature", "Définition"])
+st.dataframe(features_df, width=800, height=400)
 
 # Utiliser la barre latérale pour la recherche d'identifiant client
 st.sidebar.header("Recherche d'Identifiant Client")
@@ -50,7 +87,7 @@ option = st.sidebar.radio("Choisissez une option:", ["Informations Personnelles"
                                                      "Distributions des Caractéristiques", "Analyse Bi-Variée",
                                                      "Autres Analyses"])
 
-threshold = 0.45  # Fixer le seuil à 0.45
+threshold = 0.45  # le seuil 
 
 # Afficher les résultats dans la page principale
 if client_id and client_id != "Sélectionner un client":
@@ -140,8 +177,7 @@ if client_id and client_id != "Sélectionner un client":
             **Qu'est-ce que l'importance des caractéristiques ?**
 
             L'importance des caractéristiques est une mesure qui montre quelles caractéristiques (ou variables) ont le plus d'impact sur les décisions du modèle de prédiction. 
-            Plus une caractéristique est importante, plus elle influence le résultat de la prédiction. Par exemple, si le modèle décide d'approuver ou de refuser un crédit, 
-            les caractéristiques importantes sont celles qui ont le plus contribué à cette décision.
+            Plus une caractéristique est importante, plus elle influence le résultat de la prédiction. Par exemple, si le modèle décide d'approuver ou de refuser un crédit, les caractéristiques importantes sont celles qui ont le plus contribué à cette décision.
             """)
 
             # Permettre à l'utilisateur de choisir le nombre de caractéristiques à afficher
@@ -274,6 +310,27 @@ if client_id and client_id != "Sélectionner un client":
             st.caption(
                 "Graphique montrant l'analyse bi-variée entre les deux caractéristiques sélectionnées avec un dégradé de couleur selon le score des clients et le positionnement du client sélectionné.")
 
+            # Explications pour les personnes non expertes en data science
+            st.write("""
+            **Qu'est-ce que l'analyse bi-variée ?**
+
+            L'analyse bi-variée consiste à examiner la relation entre deux variables. Dans ce contexte, nous cherchons à voir comment deux caractéristiques (comme l'âge et le revenu) 
+            sont liées entre elles et comment elles influencent le score de prédiction de risque de crédit.
+
+            **Comment interpréter ce graphique ?**
+
+            - Les points sur le graphique représentent des clients.
+            - La couleur des points montre le score de prédiction du risque de crédit, avec une échelle de couleurs allant du vert (risque faible) au rouge (risque élevé).
+            - Le point rouge avec un "x" montre la position du client sélectionné sur ces deux caractéristiques.
+
+            **Exemple :**
+            Si vous choisissez l'âge (en jours depuis la naissance) sur l'axe X et le revenu sur l'axe Y :
+            - Vous pourriez voir que les clients plus âgés avec un revenu plus élevé ont généralement un risque de crédit plus faible (points verts).
+            - À l'inverse, les clients plus jeunes avec un revenu plus bas pourraient avoir un risque de crédit plus élevé (points rouges).
+
+            Cette analyse peut aider à comprendre quels facteurs contribuent au risque de crédit et comment ils interagissent entre eux.
+            """)
+
         elif option == "Autres Analyses":
             st.subheader("Autres Analyses des Clients")
 
@@ -290,6 +347,19 @@ if client_id and client_id != "Sélectionner un client":
             st.pyplot(fig)
             st.caption(
                 "Histogramme montrant la distribution des scores de prédiction pour tous les clients avec une ligne indiquant le score du client sélectionné.")
+
+            # Explication simple de l'importance des caractéristiques
+            st.write("""
+            **Qu'est-ce que l'importance des caractéristiques ?**
+
+            L'importance des caractéristiques indique quelles variables ont le plus d'impact sur la décision du modèle de prédiction. 
+            Cela peut aider à comprendre quelles caractéristiques sont les plus influentes pour prédire le risque de crédit.
+
+            **Pourquoi est-ce important ?**
+
+            Connaître les caractéristiques importantes peut aider à orienter les décisions de crédit et à cibler les facteurs de risque les plus critiques. 
+            Cela peut également fournir des informations utiles pour améliorer les modèles de prédiction ou pour des stratégies de gestion du risque de crédit.
+            """)
 
             # Graphique des caractéristiques importantes pour tous les clients
             st.subheader("Importance des Caractéristiques Globales")
@@ -310,25 +380,3 @@ if client_id and client_id != "Sélectionner un client":
 
             except AttributeError:
                 st.error("Le modèle sélectionné ne supporte pas l'attribut 'feature_importances_'.")
-
-            # Distribution de caractéristiques spécifiques pour tous les clients
-            st.subheader("Distribution des Caractéristiques Sélectionnées")
-            selected_features = st.multiselect("Sélectionnez des caractéristiques pour afficher les distributions:",
-                                               feature_names)
-            for feature in selected_features:
-                fig, ax = plt.subplots()
-                df[feature].hist(ax=ax, bins=30, alpha=0.5, color=colors['all_clients'], label='Tous les clients')
-                ax.axvline(client_data[feature].values[0], color=colors['selected_client'], linestyle='dashed',
-                           linewidth=2, label='Client sélectionné')
-                ax.set_title(f"Distribution de {feature}")
-                ax.legend()
-                ax.set_xlabel(feature)
-                ax.set_ylabel('Nombre de Clients')
-                st.pyplot(fig)
-                st.caption(
-                    f"Graphique montrant la distribution de {feature} pour tous les clients avec la valeur du client sélectionné.")
-
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8501))
-    st._is_running_with_streamlit = True
