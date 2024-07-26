@@ -8,7 +8,7 @@ import plotly.express as px
 import numpy as np
 import shap
 
-# Critères d'accessibilité
+# Configuration de la page
 st.set_page_config(
     page_title="Dashboard Interactif de Prédiction de Risque de Crédit",
     page_icon="📊",
@@ -26,23 +26,24 @@ with open(feature_names_path, 'r') as f:
     feature_names = [line.strip() for line in f]
 
 # Charger les données
-data_path = 'data/sampled_df1 (1).csv' 
+data_path = 'data/sampled_df1 (1).csv'  # Assurez-vous que le fichier est dans le même répertoire que ce script
 df = pd.read_csv(data_path)
 
 # Assurer que les identifiants clients sont des entiers
 df['SK_ID_CURR'] = df['SK_ID_CURR'].astype(int)
 
-# Limiter aux 10 premiers identifiants clients
+# Limiter aux 50 premiers identifiants clients
 unique_client_ids = df['SK_ID_CURR'].unique()
-limited_client_ids = unique_client_ids[:50]  
+limited_client_ids = unique_client_ids[:50]  # Sélectionner les 50 premiers identifiants
 
 # Définir les couleurs avec un contraste élevé
 colors = {
-    'all_clients': '#1f77b4',  # Blue with high contrast
-    'selected_client': '#d62728'  # Red with high contrast
+    'all_clients': '#1f77b4',  # Bleu à contraste élevé
+    'accepted_clients': '#2ca02c',  # Vert à contraste élevé
+    'rejected_clients': '#d62728'  # Rouge à contraste élevé
 }
 
-# Définir les définitions des features
+# Définir les définitions des caractéristiques
 feature_definitions = {
     "EXT_SOURCE_3": "Score externe source 3",
     "EXT_SOURCE_2": "Score externe source 2",
@@ -69,9 +70,9 @@ feature_definitions = {
 # Titre de l'application
 st.title("Dashboard Interactif de Prédiction de Risque de Crédit")
 
-# Afficher le tableau des features et définitions sur la page d'accueil
-st.subheader("Tableau des Features et Définitions")
-features_df = pd.DataFrame(list(feature_definitions.items()), columns=["Feature", "Définition"])
+# Afficher le tableau des caractéristiques et définitions sur la page d'accueil
+st.subheader("Tableau des Caractéristiques et Définitions")
+features_df = pd.DataFrame(list(feature_definitions.items()), columns=["Caractéristique", "Définition"])
 st.dataframe(features_df, width=800, height=400)
 
 # Utiliser la barre latérale pour la recherche d'identifiant client
@@ -87,7 +88,7 @@ option = st.sidebar.radio("Choisissez une option:", ["Informations Personnelles"
                                                      "Distributions des Caractéristiques", "Analyse Bi-Variée",
                                                      "Autres Analyses"])
 
-threshold = 0.45  # le seuil 
+threshold = 0.45  # Fixer le seuil à 0.45
 
 # Afficher les résultats dans la page principale
 if client_id and client_id != "Sélectionner un client":
@@ -119,7 +120,11 @@ if client_id and client_id != "Sélectionner un client":
         if option == "Informations Personnelles":
             # Afficher les informations descriptives du client
             st.subheader("Informations Descriptives du Client")
-            st.write(client_data)
+
+            selected_features = st.multiselect(
+                "Sélectionnez les caractéristiques à afficher:", feature_names, default=feature_names[:5])
+
+            st.write(client_data[selected_features].T)
 
             # Ajout de l'interprétation du score
             st.subheader("Score de Prédiction")
@@ -241,6 +246,10 @@ if client_id and client_id != "Sélectionner un client":
         elif option == "Distributions des Caractéristiques":
             st.subheader("Comparaison des Informations Descriptives")
 
+            # Prédire les probabilités pour tous les clients
+            df['probability'] = pipeline.predict_proba(df[feature_names])[:, 1]
+            df['prediction'] = df['probability'].apply(lambda x: 'accepté' if x < threshold else 'refusé')
+
             # Sélectionner des variables pour comparaison
             selected_features = st.multiselect("Sélectionnez des variables pour comparaison:", feature_names,
                                                default=feature_names[:2])
@@ -248,10 +257,19 @@ if client_id and client_id != "Sélectionner un client":
             for selected_feature in selected_features:
                 # Ajout des descriptions pour les graphiques
                 fig, ax = plt.subplots()
-                df[selected_feature].hist(ax=ax, bins=30, alpha=0.5, color=colors['all_clients'],
-                                          label='Tous les clients')
-                ax.axvline(client_data[selected_feature].values[0], color=colors['selected_client'], linestyle='dashed',
-                           linewidth=2, label='Client sélectionné')
+
+                df_accepted = df[df['prediction'] == 'accepté']
+                df_rejected = df[df['prediction'] == 'refusé']
+
+                bins = np.histogram(np.hstack((df_accepted[selected_feature], df_rejected[selected_feature])), bins=30)[
+                    1]  # obtenir des bacs cohérents
+
+                ax.hist(df_accepted[selected_feature], bins=bins, alpha=0.7, color=colors['accepted_clients'],
+                        label='Clients acceptés')
+                ax.hist(df_rejected[selected_feature], bins=bins, alpha=0.7, color=colors['rejected_clients'],
+                        label='Clients refusés')
+                ax.axvline(client_data[selected_feature].values[0], color='black', linestyle='dashed', linewidth=2,
+                           label='Client sélectionné')
                 ax.set_title(f"Distribution de {selected_feature}")
                 ax.legend()
                 ax.set_xlabel(selected_feature)
@@ -269,17 +287,15 @@ if client_id and client_id != "Sélectionner un client":
                 # Ajouter une interprétation simple du graphique
                 st.write(f"**Interprétation du graphique :**")
                 st.write(
-                    f"Le graphique ci-dessus montre la distribution de la variable '{selected_feature}' pour tous les clients comparée à celle du client sélectionné.")
+                    f"Le graphique ci-dessus montre la distribution de la variable '{selected_feature}' pour les clients acceptés (en vert) et refusés (en rouge), comparée à celle du client sélectionné (ligne noire pointillée).")
                 st.write(
-                    f"La barre bleue représente la fréquence des valeurs de '{selected_feature}' pour tous les clients, tandis que la ligne rouge pointillée montre la valeur de cette variable pour le client sélectionné.")
-                st.write(
-                    f"Si la ligne rouge est proche de la moyenne (ligne centrale de la barre bleue), cela signifie que la valeur de cette caractéristique pour le client est proche de celle de la majorité des autres clients.")
+                    f"Si la ligne noire est proche de la moyenne (ligne centrale de la barre), cela signifie que la valeur de cette caractéristique pour le client est proche de celle de la majorité des autres clients.")
                 st.write(
                     f"Des écarts significatifs peuvent indiquer des différences notables par rapport à la moyenne des clients, ce qui peut aider à identifier des particularités ou des risques potentiels.")
 
                 st.pyplot(fig)
                 st.caption(
-                    "Graphique montrant la distribution de la variable sélectionnée pour tous les clients et la position du client sélectionné.")
+                    "Graphique montrant la distribution de la variable sélectionnée pour les clients acceptés et refusés, ainsi que la position du client sélectionné.")
 
         elif option == "Analyse Bi-Variée":
             st.subheader("Analyse Bi-Variée")
@@ -360,23 +376,3 @@ if client_id and client_id != "Sélectionner un client":
             Connaître les caractéristiques importantes peut aider à orienter les décisions de crédit et à cibler les facteurs de risque les plus critiques. 
             Cela peut également fournir des informations utiles pour améliorer les modèles de prédiction ou pour des stratégies de gestion du risque de crédit.
             """)
-
-            # Graphique des caractéristiques importantes pour tous les clients
-            st.subheader("Importance des Caractéristiques Globales")
-            try:
-                importances = pipeline.named_steps['classifier'].feature_importances_
-                indices = np.argsort(importances)[::-1]
-                selected_features = [feature_names[i] for i in indices]
-                selected_importances = importances[indices]
-
-                fig = go.Figure([go.Bar(x=selected_features, y=selected_importances)])
-                fig.update_layout(title="Importance des Caractéristiques Globales",
-                                  xaxis_title="Caractéristiques",
-                                  yaxis_title="Importance",
-                                  yaxis=dict(range=[0, max(selected_importances) * 1.1]))
-
-                st.plotly_chart(fig)
-                st.caption("Graphique montrant l'importance des caractéristiques globales pour tous les clients.")
-
-            except AttributeError:
-                st.error("Le modèle sélectionné ne supporte pas l'attribut 'feature_importances_'.")
